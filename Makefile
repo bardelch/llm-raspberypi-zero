@@ -14,7 +14,7 @@ run:
 remote-build:
 	# Enable buildx (once)
 	docker buildx create --use --name pi-builder
- docker buildx inspect --bootstrap
+	docker buildx inspect --bootstrap
 
  # Build for arm/v6
- docker buildx build --platform linux/arm/v6 -t pi0-llm-agent:latest .
+	docker buildx build --platform linux/arm/v6 -t pi0-llm-agent:latest .
