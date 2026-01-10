@@ -1,86 +1,87 @@
 # =============================================================================
-# Stage 1: Builder (heavy dependencies & compilation)
-# Use a compatible 32-bit ARM base - raspbian/bullseye is one of few that works
+# Stage 1: Builder - compile llama.zero + install deps + download model
 # =============================================================================
-FROM arm32v7/debian:bullseye-slim AS builder
+FROM arm32v6/alpine:3.21 AS builder
 
-ENV DEBIAN_FRONTEND=noninteractive
+# Set non-interactive mode for apk
+ENV ALPINE_NO_INTERACTIVE=true
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install build dependencies (git, make, gcc, etc.) + wget/curl for downloads
+RUN apk add --no-cache \
     git \
-    build-essential \
+    build-base \
     cmake \
-    ca-certificates \
+    linux-headers \
     wget \
+    ca-certificates \
     python3 \
-    python3-pip \
-    python3-venv \
-    && rm -rf /var/lib/apt/lists/*
+    py3-pip \
+    py3-virtualenv \
+    && update-ca-certificates
 
 WORKDIR /build
 
-# Clone optimized llama.zero fork (ARMv6 friendly)
+# Clone optimized llama.zero fork (ARMv6 friendly - no NEON/SIMD)
 RUN git clone https://github.com/pham-tuan-binh/llama.zero.git \
     && cd llama.zero \
+    && echo "===== STARTING LLAMA.ZERO COMPILATION (expect 2-6+ hours on Pi Zero) =====" \
     && make clean \
-    && make -j1 GGML_NO_NEON=1 GGML_NO_LLAMAFILE=1  # very important: no neon!
+    && echo "===== Running make -j1 ... this is the long part =====" \
+    && make -j1 GGML_NO_NEON=1 GGML_NO_LLAMAFILE=1 \
+    && echo "===== Compilation finished! ====="
 
-# Download small coding model (Gemma-2-2B Q2_K ~800MB)
+# Download small coding model (~800 MB quantized GGUF)
 RUN mkdir -p /models \
     && wget -q --show-progress \
        https://huggingface.co/second-state/Gemma-2-2B-It-GGUF/resolve/main/Gemma-2-2B-It-Q2_K.gguf \
        -O /models/gemma-2-2b-it-q2_k.gguf
 
-# Prepare python environment
-RUN python3 -m venv /venv
-ENV PATH="/venv/bin:$PATH"
-
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir \
+# Prepare minimal Python venv for smolagents
+RUN python3 -m venv /venv \
+    && /venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /venv/bin/pip install --no-cache-dir \
        smolagents[toolkit] \
-       huggingface_hub  # just in case you want more models later
+       # Add any other tiny deps if needed; avoid heavy ones
 
-# Copy your agent script (create this file in the same folder as Dockerfile)
+# Copy your agent script (place this file next to Dockerfile)
 COPY agent.py /app/agent.py
 
 # =============================================================================
-# Stage 2: Final runtime image - as small as reasonably possible
+# Stage 2: Final ultra-light runtime image
 # =============================================================================
-FROM arm32v7/debian:bullseye-slim
+FROM arm32v6/alpine:3.21
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONUNBUFFERED=1 \
-    PATH="/venv/bin:$PATH"
-
-# Runtime dependencies only
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Minimal runtime deps: python runtime + shared libs for llama.cpp
+RUN apk add --no-cache \
     python3 \
-    python3-venv \
-    libgomp1 \
+    py3-pip \
+    libstdc++ \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean autoclean \
-    && rm -rf /var/lib/{apt,dpkg,cache,log}
+    && rm -rf /var/cache/apk/* \
+    && update-ca-certificates
+
+ENV PYTHONUNBUFFERED=1 \
+    PATH="/venv/bin:$PATH"
 
 WORKDIR /app
 
-# Copy compiled binary + model + python environment + script
+# Copy only what's needed from builder
 COPY --from=builder /build/llama.zero/main          /app/llama-main
-COPY --from=builder /models/gemma-2-2b-it-q2_k.gguf  /app/models/
+COPY --from=builder /models/gemma-2-2b-it-q2_k.gguf  /app/models/gemma-2-2b-it-q2_k.gguf
 COPY --from=builder /venv                            /venv
 COPY agent.py                                        /app/agent.py
 
-# Optional: make binary executable & reduce size a bit
+# Make binary executable
 RUN chmod +x /app/llama-main
 
-# You can use different CMD / ENTRYPOINT styles:
-# 1. Run interactive python shell
-# CMD ["python3"]
+# Optional: tiny healthcheck or just run the agent
+# HEALTHCHECK --interval=30s CMD ["python3", "-c", "print('alive')"] || exit 1
 
-# 2. Run your agent script directly
-CMD ["python3", "agent.py"]
+# Default: run your agent script
+CMD ["python3", "/app/agent.py"]
 
-# 3. Or run llama.cpp server (recommended for agent integration)
-# EXPOSE 8080
+# Alternative: run llama.cpp in server mode (OpenAI-compatible API)
 # CMD ["/app/llama-main", "--server", "--model", "/app/models/gemma-2-2b-it-q2_k.gguf", "--host", "0.0.0.0", "--port", "8080"]
+# EXPOSE 8080
+
 

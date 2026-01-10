@@ -1,6 +1,6 @@
-# agent.py - place in same directory as Dockerfile
+# agent.py
 import subprocess
-from smolagents import CodeAgent  # or your preferred agent setup
+from smolagents import CodeAgent
 
 class LocalLlamaCpp:
     def __init__(self):
@@ -14,16 +14,17 @@ class LocalLlamaCpp:
             "-p", prompt,
             "-n", str(max_tokens),
             "--temp", str(temp),
+            "--color"  # optional, remove on non-terminal
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.stdout.strip()
 
-# Basic usage example
-if __name__ == "__main__":
-    llm = LocalLlamaCpp()
-    agent = CodeAgent(model=llm, max_iterations=6)  # customize tools/max etc.
+# Very basic usage - customize as needed
+llm = LocalLlamaCpp()
+agent = CodeAgent(model=llm, max_iterations=6)  # add tools later
 
-    print("Agent ready. Example:")
-    response = agent.run("Write and explain a tiny Python script for Pi Zero temperature monitoring.")
+if __name__ == "__main__":
+    print("Agent ready. Example query:")
+    response = agent.run("Write Python code that prints 'Hello from Pi Zero Docker!'")
     print(response)
 
