@@ -25,9 +25,8 @@ WORKDIR /build
 RUN git clone https://github.com/pham-tuan-binh/llama.zero.git \
     && cd llama.zero \
     && echo "===== STARTING LLAMA.ZERO COMPILATION (expect 2-6+ hours on Pi Zero) =====" \
-    && make clean \
-    && echo "===== Running make -j1 ... this is the long part =====" \
-    && make -j1 GGML_NO_NEON=1 GGML_NO_LLAMAFILE=1 \
+    && cmake -B build
+    && cmake --build build --config Release
     && echo "===== Compilation finished! ====="
 
 # Download small coding model (~800 MB quantized GGUF)
