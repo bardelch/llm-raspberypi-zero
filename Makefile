@@ -5,6 +5,9 @@ all:
 	#docker build --progress=plain -t pi0-llm-agent:latest .
 	docker build --progress=plain -t pi0-llm-agent:latest . 2>&1 | tee build-log.txt
 
+builder:
+	docker build --progress=plain -f Dockerfile.builder -t bardelch/pi0-llm-builder:latest . 2>&1 | tee build-log.txt
+
 run:
 	docker run --rm -it \
 		--memory=450m \
@@ -18,3 +21,7 @@ remote-build:
 
  # Build for arm/v6
 	docker buildx build --platform linux/arm/v6 -t pi0-llm-agent:latest .
+
+push:
+	docker push bardelch/pi0-llm-builder
+#	docker push pi0-llm-agent

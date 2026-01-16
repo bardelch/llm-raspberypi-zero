@@ -29,17 +29,18 @@ RUN git clone https://github.com/pham-tuan-binh/llama.zero.git \
     && cmake --build build --config Release \
     && echo "===== Compilation finished! ====="
 
-# Download small coding model (~800 MB quantized GGUF)
-RUN mkdir -p /models \
-    && wget -q --show-progress \
-       https://huggingface.co/second-state/Gemma-2-2B-It-GGUF/resolve/main/Gemma-2-2B-It-Q2_K.gguf \
-       -O /models/gemma-2-2b-it-q2_k.gguf
+# # Download small coding model (~800 MB quantized GGUF)
+# RUN mkdir -p /models \
+#     && wget -q --show-progress \
+#        https://huggingface.co/second-state/Gemma-2-2B-It-GGUF/resolve/main/Gemma-2-2B-It-Q2_K.gguf \
+#        -O /models/gemma-2-2b-it-q2_k.gguf
 
 # Prepare minimal Python venv for smolagents
 RUN python3 -m venv /venv \
     && /venv/bin/pip install --no-cache-dir --upgrade pip \
     && /venv/bin/pip install --no-cache-dir \
-       smolagents[toolkit] \
+       smolagents[toolkit] 
+       #smolagents[toolkit] \
        # Add any other tiny deps if needed; avoid heavy ones
 
 # Copy your agent script (place this file next to Dockerfile)
@@ -65,22 +66,22 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Copy only what's needed from builder
-COPY --from=builder /build/llama.zero/main          /app/llama-main
-COPY --from=builder /models/gemma-2-2b-it-q2_k.gguf  /app/models/gemma-2-2b-it-q2_k.gguf
-COPY --from=builder /venv                            /venv
-COPY agent.py                                        /app/agent.py
-
-# Make binary executable
-RUN chmod +x /app/llama-main
-
-# Optional: tiny healthcheck or just run the agent
-# HEALTHCHECK --interval=30s CMD ["python3", "-c", "print('alive')"] || exit 1
-
-# Default: run your agent script
-CMD ["python3", "/app/agent.py"]
-
-# Alternative: run llama.cpp in server mode (OpenAI-compatible API)
-# CMD ["/app/llama-main", "--server", "--model", "/app/models/gemma-2-2b-it-q2_k.gguf", "--host", "0.0.0.0", "--port", "8080"]
-# EXPOSE 8080
-
-
+# COPY --from=builder /build/llama.zero/main          /app/llama-main
+# COPY --from=builder /models/gemma-2-2b-it-q2_k.gguf  /app/models/gemma-2-2b-it-q2_k.gguf
+# COPY --from=builder /venv                            /venv
+# COPY agent.py                                        /app/agent.py
+# 
+# # Make binary executable
+# RUN chmod +x /app/llama-main
+# 
+# # Optional: tiny healthcheck or just run the agent
+# # HEALTHCHECK --interval=30s CMD ["python3", "-c", "print('alive')"] || exit 1
+# 
+# # Default: run your agent script
+# CMD ["python3", "/app/agent.py"]
+# 
+# # Alternative: run llama.cpp in server mode (OpenAI-compatible API)
+# # CMD ["/app/llama-main", "--server", "--model", "/app/models/gemma-2-2b-it-q2_k.gguf", "--host", "0.0.0.0", "--port", "8080"]
+# # EXPOSE 8080
+# 
+# 
