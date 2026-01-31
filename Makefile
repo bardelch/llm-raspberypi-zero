@@ -12,7 +12,9 @@ run:
 	docker run --rm -it \
 		--memory=450m \
 		--cpus=0.9 \
-		pi0-llm-agent:latest
+		-v ${HOME}/llm:/llm \
+		bardelch/pi0-llm-builder:latest
+		# bardelch/pi0-llm-agent:latest
 
 remote-build:
 	# Enable buildx (once)
